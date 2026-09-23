@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CaseVector Quiz Widget</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<style>
+  :root{
+    --gold:#d3a74e;
+    --navy:#162f45;
+    --bg:#f7f8f9;
+    --text:#162f45;
+    --muted:#6b7a89;
+    --border:#e6e9ee;
+    --white:#ffffff;
+    --radius:14px;
+    --radius-sm:10px;
+  }
+  #cv-quiz-root{
+    font-family:'Inter',system-ui,sans-serif;
+    max-width:640px;
+    margin:0 auto;
+    color:var(--text);
+    line-height:1.4;
+  }
+ .cv-widget{
+    background:var(--white);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:22px;
+    box-shadow:0 4px 24px rgba(22,47,69,0.06);
+  }
+ .cv-header h2{
+    font-size:20px; font-weight:700; margin:0 0 6px; letter-spacing:-0.02em; color:var(--navy);
+  }
+ .cv-header p{ margin:0; font-size:13px; color:var(--muted); }
+ .cv-progress{ margin:16px 0 18px; }
+ .cv-progress-top{ display:flex; justify-content:space-between; font-size:11px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px; }
+ .cv-bar{ height:6px; background:#eef1f4; border-radius:100px; overflow:hidden; }
+ .cv-bar-fill{ height:100%; background:var(--gold); border-radius:100px; transition:width.3s ease; }
+ .cv-stage{ animation: cvFade.25s ease; }
+  @keyframes cvFade{ from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:translateY(0)} }
+ .cv-q{ margin-bottom:18px; }
+ .cv-q.unanswered.cv-q-title{ color:#c2410c; }
+ .cv-q-title{ font-size:14px; font-weight:600; margin:0 0 10px; }
+ .cv-options{ display:flex; flex-wrap:wrap; gap:8px; }
+ .cv-select{
+    width:100%;
+    border:1px solid var(--border);
+    background:#fff;
+    border-radius:100px;
+    padding:10px 40px 10px 14px;
+    font-size:13px;
+    font-weight:500;
+    color:var(--navy);
+    cursor:pointer;
+    outline:none;
+    transition:all.15s;
+    appearance:auto;
+  }
+ .cv-select:hover{ border-color:var(--navy); }
+ .cv-select:focus{ border-color:var(--navy); }
+ .cv-select option{ color:var(--navy); }
+ .cv-nav{ display:flex; justify-content:space-between; align-items:center; margin-top:8px; gap:12px; }
+ .cv-btn{
+    border:0; border-radius:100px; padding:10px 18px; font-size:13px; font-weight:600;
+    cursor:pointer; transition:all.15s; display:inline-flex; align-items:center; gap:6px;
+  }
+ .cv-btn:disabled{ opacity:.4; cursor:not-allowed; }
+ .cv-btn-return{ background:#eef1f4; color:var(--navy); }
+ .cv-btn-next{ background:var(--gold); color:var(--navy); margin-left:auto; }
+ .cv-btn-next:hover{ filter:brightness(0.95); }
+ .cv-result{ text-align:center; padding:6px 4px; }
+ .cv-badge{ display:inline-block; background:var(--gold); color:var(--navy); font-size:11px; font-weight:700; letter-spacing:.08em; padding:6px 10px; border-radius:100px; margin-bottom:12px; }
+ .cv-result h3{ font-size:22px; margin:0 0 10px; color:var(--navy); letter-spacing:-0.02em; }
+ .cv-result p{ font-size:14px; color:#334155; margin:0 auto 16px; max-width:520px; }
+ .cv-factors{ text-align:left; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-sm); padding:14px; margin:16px 0; }
+ .cv-factors h4{ font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:0 0 8px; }
+ .cv-factors li{ font-size:13px; margin-bottom:6px; }
+ .cv-email-box{ margin-top:18px; border-top:1px solid var(--border); padding-top:16px; text-align:left; }
+ .cv-email-box label{ font-size:13px; font-weight:600; display:block; margin-bottom:8px; }
+ .cv-email-row{ display:flex; gap:8px; }
+ .cv-input{ flex:1; border:1px solid var(--border); border-radius:100px; padding:10px 14px; font-size:13px; outline:none; }
+ .cv-input:focus{ border-color:var(--navy); }
+ .cv-small{ font-size:11px; color:var(--muted); margin-top:8px; }
+  @media(max-width:520px){
+    .cv-options{ flex-direction:column; }
+    .cv-select{ border-radius:12px; width:100%; }
+    .cv-widget{ padding:16px; }
+  }
+</style>
+</head>
+<body>
+<div id="cv-quiz-root">
+  <div class="cv-widget" id="cv-widget"></div>
+</div>
+<script>
+// --- CONFIGURE EMAILJS HERE ---
+const EMAILJS_CONFIG = {
+  SERVICE_ID: "YOUR_SERVICE_ID",
+  TEMPLATE_ID: "YOUR_TEMPLATE_ID",
+  PUBLIC_KEY: "YOUR_PUBLIC_KEY",
+  TO_EMAIL: "hello@casevector.com" // used in template
+};
+if(EMAILJS_CONFIG.PUBLIC_KEY!== "YOUR_PUBLIC_KEY"){
+  emailjs.init(EMAILJS_CONFIG.PUBLIC_KEY);
+}
+// --- QUIZ DATA + SCORING ---
+// Scores: {agency, inhouse, hybrid}
+const QUESTIONS = [
+  { id:1, text:"What is your current monthly marketing budget?", options:[
+    {label:"<$2,000", scores:{agency:2, inhouse:0, hybrid:1}},
+    {label:"$2,000–$5,000", scores:{agency:3, inhouse:0, hybrid:2}},
+    {label:"$5,000–$15,000", scores:{agency:3, inhouse:1, hybrid:3}},
+    {label:"$15,000–$30,000", scores:{agency:1, inhouse:3, hybrid:3}},
+    {label:"$30,000+", scores:{agency:0, inhouse:4, hybrid:2}},
+  ]},
+  { id:2, text:"How large is your current marketing team?", options:[
+    {label:"None", scores:{agency:4, inhouse:0, hybrid:1}},
+    {label:"1 person", scores:{agency:3, inhouse:0, hybrid:2}},
+    {label:"2–3", scores:{agency:1, inhouse:2, hybrid:3}},
+    {label:"4–7", scores:{agency:0, inhouse:4, hybrid:1}},
+    {label:"8+", scores:{agency:0, inhouse:5, hybrid:0}},
+  ]},
+  { id:3, text:"Firm size (number of attorneys)?", options:[
+    {label:"1–5", scores:{agency:3, inhouse:0, hybrid:1}},
+    {label:"6–15", scores:{agency:3, inhouse:1, hybrid:2}},
+    {label:"16–40", scores:{agency:1, inhouse:2, hybrid:3}},
+    {label:"40–100", scores:{agency:0, inhouse:3, hybrid:3}},
+    {label:"100+", scores:{agency:0, inhouse:4, hybrid:2}},
+  ]},
+  { id:4, text:"How confident are you in your team's marketing expertise?", options:[
+    {label:"Very Low", scores:{agency:4, inhouse:0, hybrid:1}},
+    {label:"Low", scores:{agency:3, inhouse:0, hybrid:1}},
+    {label:"Medium", scores:{agency:1, inhouse:1, hybrid:3}},
+    {label:"High", scores:{agency:0, inhouse:3, hybrid:2}},
+    {label:"Very High", scores:{agency:0, inhouse:5, hybrid:0}},
+  ]},
+  { id:5, text:"How is your current marketing performing?", options:[
+    {label:"Very Low", scores:{agency:3, inhouse:0, hybrid:1}},
+    {label:"Low", scores:{agency:3, inhouse:0, hybrid:2}},
+    {label:"Medium", scores:{agency:1, inhouse:1, hybrid:3}},
+    {label:"High", scores:{agency:0, inhouse:3, hybrid:2}},
+    {label:"Very High", scores:{agency:0, inhouse:4, hybrid:1}},
+  ]},
+  { id:6, text:"How many marketing functions do you need covered? (SEO, PPC, content, etc.)", options:[
+    {label:"1–2", scores:{agency:0, inhouse:2, hybrid:2}},
+    {label:"3–4", scores:{agency:2, inhouse:1, hybrid:2}},
+    {label:"5–6", scores:{agency:3, inhouse:0, hybrid:2}},
+    {label:"7+", scores:{agency:4, inhouse:0, hybrid:1}},
+  ]},
+  { id:7, text:"What is your typical monthly marketing workload?", options:[
+    {label:"Very Low", scores:{agency:2, inhouse:0, hybrid:1}},
+    {label:"Low", scores:{agency:3, inhouse:0, hybrid:1}},
+    {label:"Medium", scores:{agency:2, inhouse:1, hybrid:3}},
+    {label:"High", scores:{agency:1, inhouse:3, hybrid:2}},
+    {label:"Very High / Always-on", scores:{agency:0, inhouse:4, hybrid:2}},
+  ]},
+  { id:8, text:"Do you need specialized expertise (legal SEO, intake, compliance)?", options:[
+    {label:"Yes, critical", scores:{agency:4, inhouse:0, hybrid:2}},
+    {label:"Yes, somewhat", scores:{agency:2, inhouse:1, hybrid:2}},
+    {label:"No", scores:{agency:0, inhouse:3, hybrid:1}},
+  ]},
+  { id:9, text:"How many channels are you active on?", options:[
+    {label:"1", scores:{agency:0, inhouse:2, hybrid:1}},
+    {label:"2–3", scores:{agency:1, inhouse:2, hybrid:2}},
+    {label:"4–6", scores:{agency:3, inhouse:1, hybrid:2}},
+    {label:"7+", scores:{agency:4, inhouse:0, hybrid:1}},
+  ]},
+  { id:10, text:"How difficult is it for you to hire marketing talent locally?", options:[
+    {label:"Very difficult", scores:{agency:4, inhouse:0, hybrid:1}},
+    {label:"Somewhat difficult", scores:{agency:2, inhouse:1, hybrid:2}},
+    {label:"Easy", scores:{agency:0, inhouse:3, hybrid:1}},
+  ]},
+  { id:11, text:"Can you recruit specialists (SEO lead, PPC, designers) in-house?", options:[
+    {label:"No", scores:{agency:4, inhouse:0, hybrid:1}},
+    {label:"Partially", scores:{agency:1, inhouse:1, hybrid:3}},
+    {label:"Yes", scores:{agency:0, inhouse:4, hybrid:1}},
+  ]},
+  { id:12, text:"How quickly do you need results/capabilities?", options:[
+    {label:"Immediately (0–30 days)", scores:{agency:4, inhouse:0, hybrid:1}},
+    {label:"Soon (1–3 months)", scores:{agency:3, inhouse:0, hybrid:2}},
+    {label:"Gradual (3–12 months)", scores:{agency:0, inhouse:2, hybrid:3}},
+  ]},
+  { id:13, text:"How much leadership bandwidth do you have to manage marketing?", options:[
+    {label:"Very Low", scores:{agency:4, inhouse:0, hybrid:1}},
+    {label:"Low", scores:{agency:3, inhouse:0, hybrid:2}},
+    {label:"Medium", scores:{agency:1, inhouse:1, hybrid:3}},
+    {label:"High", scores:{agency:0, inhouse:4, hybrid:1}},
+  ]},
+  { id:14, text:"Desired level of control over day-to-day marketing?", options:[
+    {label:"Low - outcome matters", scores:{agency:4, inhouse:0, hybrid:1}},
+    {label:"Medium - oversight", scores:{agency:1, inhouse:1, hybrid:3}},
+    {label:"High - full control", scores:{agency:0, inhouse:4, hybrid:1}},
+  ]},
+  { id:15, text:"Willingness to outsource core marketing?", options:[
+    {label:"Very willing", scores:{agency:4, inhouse:0, hybrid:1}},
+    {label:"Somewhat willing", scores:{agency:1, inhouse:1, hybrid:3}},
+    {label:"Not willing", scores:{agency:0, inhouse:5, hybrid:0}},
+  ]},
+  { id:16, text:"Do you need flexibility to scale up/down quickly?", options:[
+    {label:"Yes, critical", scores:{agency:3, inhouse:0, hybrid:3}},
+    {label:"Somewhat", scores:{agency:1, inhouse:1, hybrid:3}},
+    {label:"No, stable workload", scores:{agency:0, inhouse:4, hybrid:1}},
+  ]},
+  { id:17, text:"Primary annual firm revenue?", options:[
+    {label:"<$1M", scores:{agency:3, inhouse:0, hybrid:1}},
+    {label:"$1M–$5M", scores:{agency:3, inhouse:1, hybrid:2}},
+    {label:"$5M–$15M", scores:{agency:1, inhouse:2, hybrid:3}},
+    {label:"$15M+", scores:{agency:0, inhouse:4, hybrid:2}},
+  ]},
+  { id:18, text:"What describes your marketing best?", options:[
+    {label:"Mostly one-off campaigns", scores:{agency:4, inhouse:0, hybrid:1}},
+    {label:"Mix of campaigns + ongoing", scores:{agency:1, inhouse:1, hybrid:4}},
+    {label:"Consistent, always-on engine needed", scores:{agency:0, inhouse:4, hybrid:2}},
+  ]},
+];
+let state = { step:0, answers:{} }; // step = group index (0..5)
+const GROUP = 3;
+const totalGroups = Math.ceil(QUESTIONS.length / GROUP);
+function render(){
+  const root = document.getElementById('cv-widget');
+  if(state.result){
+    root.innerHTML = renderResult();
+    bindResult();
+    return;
+  }
+  const start = state.step * GROUP;
+  const qs = QUESTIONS.slice(start, start+GROUP);
+  const answeredInGroup = qs.filter(q=>state.answers[q.id]!=null).length;
+  const progressText = `Questions ${start+1}–${Math.min(start+GROUP, QUESTIONS.length)} of ${QUESTIONS.length}`;
+  const progressPct = ((start + answeredInGroup)/QUESTIONS.length)*100;
+  root.innerHTML = `
+    <div class="cv-header">
+      <h2>In-House Marketing VS Marketing Agency</h2>
+      <p>Answer these questions to find out which option suits your firm best and avoid wasting time and money.</p>
+    </div>
+    <div class="cv-progress">
+      <div class="cv-progress-top"><span>${progressText}</span><span>${Math.round(progressPct)}%</span></div>
+      <div class="cv-bar"><div class="cv-bar-fill" style="width:${progressPct}%"></div></div>
+    </div>
+    <div class="cv-stage">
+      ${qs.map(q=>{
+        const sel = state.answers[q.id];
+        const unanswered = state.showValidation && sel==null;
+        return `<div class="cv-q ${unanswered?'unanswered':''}" data-q="${q.id}">
+          <div class="cv-q-title">${q.id}. ${q.text}${unanswered?' — required':''}</div>
+          <div class="cv-options">
+            <select class="cv-select" data-q="${q.id}">
+              <option value="" ${sel==null?'selected':''} disabled>Select an option</option>
+              ${q.options.map((o,i)=>`
+                <option value="${i}" ${sel===i?'selected':''}>${o.label}</option>
+              `).join('')}
+            </select>
+          </div>
+        </div>`
+      }).join('')}
+      <div class="cv-nav">
+        ${state.step>0? `<button class="cv-btn cv-btn-return" id="cv-return">← Return</button>` : `<span></span>`}
+        <button class="cv-btn cv-btn-next" id="cv-next" ${answeredInGroup<GROUP?'disabled':''}>
+          ${state.step===totalGroups-1?'See Results →':'Next →'}
+        </button>
+      </div>
+    </div>
+  `;
+  // bind dropdowns
+  root.querySelectorAll('.cv-select').forEach(select=>{
+    select.addEventListener('change', ()=>{
+      const qid = parseInt(select.dataset.q);
+      const idx = parseInt(select.value);
+      state.answers[qid]=idx;
+      state.showValidation=false;
+      render();
+    });
+  });
+  document.getElementById('cv-return')?.addEventListener('click', ()=>{ state.step--; state.showValidation=false; render(); });
+  document.getElementById('cv-next')?.addEventListener('click', ()=>{
+    if(answeredInGroup<GROUP){ state.showValidation=true; render(); return; }
+    if(state.step===totalGroups-1){ calculateResult(); render(); }
+    else { state.step++; state.showValidation=false; render(); }
+  });
+}
+function calculateResult(){
+  let scores={agency:0,inhouse:0,hybrid:0};
+  let summary=[];
+  QUESTIONS.forEach(q=>{
+    const ansIdx = state.answers[q.id];
+    if(ansIdx!=null){
+      const opt = q.options[ansIdx];
+      scores.agency+=opt.scores.agency||0;
+      scores.inhouse+=opt.scores.inhouse||0;
+      scores.hybrid+=opt.scores.hybrid||0;
+      summary.push(`${q.text}: ${opt.label}`);
+    }
+  });
+  // tie-breaker logic weighted
+  let winner='hybrid';
+  if(scores.agency>scores.inhouse && scores.agency>scores.hybrid) winner='agency';
+  else if(scores.inhouse>scores.agency && scores.inhouse>scores.hybrid) winner='inhouse';
+  else if(scores.hybrid>=scores.agency && scores.hybrid>=scores.inhouse) winner='hybrid';
+  else if(scores.agency===scores.inhouse) winner='hybrid';
+  state.result={winner, scores, summary};
+}
+function renderResult(){
+  const {winner, scores} = state.result;
+  const copy={
+    agency:{
+      title:"Agency Fit",
+      desc:`Based on your budget, current team size, and need for specialized expertise, working with an external marketing agency may be the most efficient path. Your answers suggest limited internal capacity or a need for fast, multi-channel execution — typical signals for agency support.`,
+      factors:["No or small internal team","Need for specialists across channels","Speed and flexibility required","Limited management bandwidth"]
+    },
+    inhouse:{
+      title:"In-House Fit",
+      desc:`Your responses indicate strong internal resources, consistent workload, and a preference for control. Building or expanding an in-house team appears aligned with your situation — you have the budget, volume, and oversight capacity to justify dedicated roles.`,
+      factors:["Larger budget and firm size","Established team and expertise","High ongoing workload","Preference for full control"]
+    },
+    hybrid:{
+      title:"Hybrid Fit",
+      desc:`Your firm sits in the middle — some internal capability exists, but gaps remain for specialized functions or scaling. A hybrid model — core team in-house supported by an external partner for SEO, PPC, content, or design — may balance control, cost, and expertise.`,
+      factors:["Moderate team with gaps in expertise","Mixed workload of ongoing + campaigns","Need for both control and flexibility","Growth stage where scaling matters"]
+    }
+  };
+  const c = copy[winner];
+  return `
+    <div class="cv-result">
+      <div class="cv-badge">YOUR RESULT</div>
+      <h3>${c.title}</h3>
+      <p>${c.desc}</p>
+      <div class="cv-factors"><h4>Key factors from your answers</h4><ul style="margin:0;padding-left:18px;">${c.factors.map(f=>`<li>${f}</li>`).join('')}</ul></div>
+      <div class="cv-email-box">
+        <label for="cv-email">Want a copy of your result?</label>
+        <div class="cv-email-row">
+          <input id="cv-email" class="cv-input" type="email" placeholder="Your work email" />
+          <button class="cv-btn cv-btn-next" id="cv-send">Get My Result</button>
+        </div>
+        <div class="cv-small" id="cv-email-msg">We'll email your result and key factors. No spam.</div>
+      </div>
+      <div style="margin-top:18px;">
+        <button class="cv-btn cv-btn-return" id="cv-restart">Restart quiz</button>
+      </div>
+    </div>
+  `;
+}
+function bindResult(){
+  document.getElementById('cv-restart').addEventListener('click', ()=>{
+    state={step:0, answers:{}}; render();
+  });
+  document.getElementById('cv-send').addEventListener('click', async()=>{
+    const emailEl = document.getElementById('cv-email');
+    const msgEl = document.getElementById('cv-email-msg');
+    const email = emailEl.value.trim();
+    if(!email ||!/^\S+@\S+\.\S+$/.test(email)){ msgEl.textContent="Please enter a valid work email."; emailEl.style.borderColor="#c2410c"; return; }
+    msgEl.textContent="Sending...";
+    try{
+      if(EMAILJS_CONFIG.PUBLIC_KEY==="YOUR_PUBLIC_KEY"){
+        msgEl.textContent="Result saved (configure EmailJS to enable email).";
+        return;
+      }
+      const payload={
+        user_email: email,
+        quiz_result: state.result.winner.toUpperCase(),
+        result_title: state.result.winner,
+        scores: `A:${state.result.scores.agency} I:${state.result.scores.inhouse} H:${state.result.scores.hybrid}`,
+        answers: state.result.summary.join(' | ').slice(0,1500),
+        timestamp: new Date().toISOString()
+      };
+      await emailjs.send(EMAILJS_CONFIG.SERVICE_ID, EMAILJS_CONFIG.TEMPLATE_ID, payload);
+      msgEl.textContent="Sent! Check your inbox.";
+      emailEl.value="";
+    }catch(e){
+      console.error(e);
+      msgEl.textContent="Result saved. Email delivery is temporarily unavailable, but you still have your result on screen.";
+    }
+  });
+}
+render();
+</script>
+</body>
+</html>
